@@ -1,12 +1,13 @@
 {
   "name": "rainline",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:engine": "tsx scripts/verify-engine.ts"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -17,6 +18,7 @@
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "less": "^4.2.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.3.3",
     "vite": "^6.4.3"
   }

@@ -2,6 +2,46 @@
 
 日期：2026-07-28
 
+## v2 手感与视觉技能复验（2026-07-29）
+
+用户反馈 v1 路径明显落后手指、视觉能力只停留在弱装饰。源码审计确认：
+
+1. 路径头固定 230 px/s，抬手追赶仅 160 ms，快拖时容易误撤回。
+2. 闭合后 `trailLength` 已清零，大小圈音效判断总是读取为小圈。
+3. 雨滴与随机涟漪没有共享落点，湿面反射弱，未达到雨面合同的可见辨识度。
+4. live trail 闭合后立即消失，头像点阵不响应触摸；两个能力没有进入核心循环。
+
+v2 修复与证据：
+
+- 路径头改为 310→520 逻辑 px/s 距离自适应追随；34 px 近岸吸附；抬手追赶
+  延长到 580 ms。`scripts/verify-engine.ts` 已验证近岸起线和抬手闭合，结果占领率
+  从 8% 增至 10.26%。
+- 捕获保留真实路径历史、捕获强度和大小圈音效输入；`capturePower` 测试值
+  0.608，闭合后 `echoTrail` 仍存在。
+- 雨面把每条可见雨线对应到确定性落点、飞溅和扩散环；未占领湿面增加低频移动
+  反射，胜利停雨后仍保持湿度。
+- live trail 使用深色身体、暖白亮芯、流动节点和距离危险染色；闭合保留琥珀
+  余迹与六叶光学峰值，断裂保留红色余迹、虚线边框和文字原因。
+- 真实头像使用不读回 Canvas 的对应细网格；路径头附近产生局部旋涡位移，闭合波
+  推动局部粒子后回稳。正式 WebGPU history、FFT 卷积和浮点累积散景未启用，
+  文档不再把 Canvas 降级冒充正式 GPU 管线。
+- 390×844 证据：
+  `390x844-platform-layout-v2-idle.png`、
+  `390x844-platform-layout-v2-drawing.png`、
+  `390x844-platform-layout-v2-capture.png`、
+  `390x844-platform-layout-v2-hit.png`、
+  `390x844-platform-layout-v2-win.png`。
+- 320×568 证据：
+  `320x568-platform-layout-v2-idle.png`、
+  `320x568-platform-layout-v2-win.png`。文档宽高等于视口，棋盘 296×418；
+  声音与暂停控件均为 44×44，长英文名称未造成横向溢出。
+- `external-guest` 证据：`390x844-external-guest-v2.png`；远程访客栏可见，
+  body padding 保持 0，生产源码不为它改写平台构图。
+- 320×568、76% 结果态 1.1 秒 CDP 采样：ScriptDuration 增量约 153.9 ms，
+  TaskDuration 增量约 254.2 ms，LayoutDuration 增量约 0.4 ms。头像细网格在
+  玩法态约 30 fps、结果态约 15 fps 更新，权威几何和雨面仍按主 RAF 运行。
+- 浏览器 console：无 error/warning。
+
 ## 验证范围
 
 - 真实 Chromium：390×844、320×568。

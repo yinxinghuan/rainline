@@ -28,6 +28,23 @@ if (captured.ratio <= initial.ratio) {
 if (captured.score <= 0 || captured.trail.length !== 0) {
   throw new Error(`Capture did not settle correctly: score=${captured.score}, trail=${captured.trail.length}`)
 }
+if (captured.capturePower <= 0 || captured.echoTrail.length < 2 || captured.echoKind !== 'capture') {
+  throw new Error('Capture did not preserve a visual history trail')
+}
+
+const forgiving = new RainlineEngine()
+if (!forgiving.pointerDown({ x: 300, y: 450 })) {
+  throw new Error('Near-shore start did not snap to the safe boundary')
+}
+forgiving.pointerMove({ x: 300, y: 410 })
+advance(forgiving, 0.18)
+forgiving.pointerMove({ x: 354, y: 410 })
+forgiving.pointerUp()
+advance(forgiving, 0.56)
+const forgivingCapture = forgiving.snapshot()
+if (forgivingCapture.ratio <= initial.ratio || forgivingCapture.score <= 0) {
+  throw new Error(`Release grace did not finish the intended closure: ratio=${forgivingCapture.ratio}`)
+}
 
 engine.forceHitForQa()
 const hit = engine.snapshot()
@@ -45,6 +62,8 @@ console.log(JSON.stringify({
   initialRatio: initial.ratio,
   capturedRatio: captured.ratio,
   capturedScore: captured.score,
+  forgivingCaptureRatio: forgivingCapture.ratio,
+  capturePower: captured.capturePower,
   livesAfterHit: hit.lives,
   winRatio: won.ratio,
 }))

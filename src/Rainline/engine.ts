@@ -16,7 +16,10 @@ const CELL_W = BOARD_W / GRID_W
 const CELL_H = BOARD_H / GRID_H
 const BORDER = 2
 const START_ROWS = 8
-const PLAYER_SPEED = 230
+const PLAYER_SPEED = 310
+const PLAYER_CATCHUP_SPEED = 520
+const START_SNAP_RADIUS = 34
+const RELEASE_GRACE_SECONDS = 0.58
 const STORM_RADIUS = 11
 const TRAIL_RADIUS = 4
 
@@ -57,6 +60,8 @@ export class RainlineEngine {
   private anchor: Point = { ...this.player }
   private target: Point = { ...this.player }
   private trail: Point[] = []
+  private echoTrail: Point[] = []
+  private echoKind: 'capture' | 'hit' | null = null
   private pointerActive = false
   private releaseGrace = 0
   private timerStarted = false
@@ -65,7 +70,10 @@ export class RainlineEngine {
   private probe: Probe = { active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, warning: 0 }
   private probeCooldown = 4.8
   private capturePulse = 0
+  private capturePower = 0
   private hitPulse = 0
+  private touchPulse = 0
+  private touchPoint: Point = { ...this.player }
   private elapsed = 0
   private hitRecovery = 0
   private pausedFrom: Phase = 'ready'
@@ -88,6 +96,26 @@ export class RainlineEngine {
   private isOwned(point: Point) {
     const cell = this.cell(point)
     return this.occupied[this.index(cell.x, cell.y)] === 1
+  }
+
+  private nearestOwnedPoint(point: Point) {
+    const center = this.cell(point)
+    const radiusX = Math.ceil(START_SNAP_RADIUS / CELL_W)
+    const radiusY = Math.ceil(START_SNAP_RADIUS / CELL_H)
+    let nearest: Point | null = null
+    let nearestDistance = START_SNAP_RADIUS
+    for (let y = Math.max(0, center.y - radiusY); y <= Math.min(GRID_H - 1, center.y + radiusY); y += 1) {
+      for (let x = Math.max(0, center.x - radiusX); x <= Math.min(GRID_W - 1, center.x + radiusX); x += 1) {
+        if (!this.occupied[this.index(x, y)]) continue
+        const candidate = { x: (x + 0.5) * CELL_W, y: (y + 0.5) * CELL_H }
+        const candidateDistance = distance(point, candidate)
+        if (candidateDistance <= nearestDistance) {
+          nearest = candidate
+          nearestDistance = candidateDistance
+        }
+      }
+    }
+    return nearest
   }
 
   private resetGrid() {
@@ -120,6 +148,8 @@ export class RainlineEngine {
     this.anchor = { ...this.player }
     this.target = { ...this.player }
     this.trail = []
+    this.echoTrail = []
+    this.echoKind = null
     this.pointerActive = false
     this.releaseGrace = 0
     this.timerStarted = false
@@ -128,7 +158,10 @@ export class RainlineEngine {
     this.probe = { active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, warning: 0 }
     this.probeCooldown = 4.8
     this.capturePulse = 0
+    this.capturePower = 0
     this.hitPulse = 0
+    this.touchPulse = 0
+    this.touchPoint = { ...this.player }
     this.elapsed = 0
     this.hitRecovery = 0
     this.resetGrid()
@@ -136,10 +169,14 @@ export class RainlineEngine {
 
   pointerDown(point: Point) {
     if (this.phase !== 'ready' && this.phase !== 'playing') return false
-    if (!this.isOwned(point) || this.hitRecovery > 0) return false
-    this.player = { ...point }
-    this.anchor = { ...point }
-    this.target = { ...point }
+    if (this.hitRecovery > 0) return false
+    const start = this.isOwned(point) ? point : this.nearestOwnedPoint(point)
+    if (!start) return false
+    this.player = { ...start }
+    this.anchor = { ...start }
+    this.target = { ...start }
+    this.touchPoint = { ...point }
+    this.touchPulse = 1
     this.pointerActive = true
     this.releaseGrace = 0
     if (this.phase === 'ready') this.phase = 'playing'
@@ -152,12 +189,13 @@ export class RainlineEngine {
       x: clamp(point.x, CELL_W, BOARD_W - CELL_W),
       y: clamp(point.y, CELL_H, BOARD_H - CELL_H),
     }
+    this.touchPoint = { ...this.target }
   }
 
   pointerUp() {
     if (!this.pointerActive) return
     if (this.trail.length > 0) {
-      this.releaseGrace = 0.16
+      this.releaseGrace = RELEASE_GRACE_SECONDS
       return
     }
     this.pointerActive = false
@@ -181,7 +219,8 @@ export class RainlineEngine {
     const dy = this.target.y - this.player.y
     const remaining = Math.hypot(dx, dy)
     if (remaining < 0.2) return
-    const step = Math.min(remaining, PLAYER_SPEED * dt)
+    const speed = clamp(PLAYER_SPEED + remaining * 1.65, PLAYER_SPEED, PLAYER_CATCHUP_SPEED)
+    const step = Math.min(remaining, speed * dt)
     const next = {
       x: this.player.x + (dx / remaining) * step,
       y: this.player.y + (dy / remaining) * step,
@@ -307,6 +346,9 @@ export class RainlineEngine {
     this.longestTrail = Math.max(this.longestTrail, length)
     if (near) this.nearMisses += 1
     this.message = `${near ? '险过 · ' : ''}+${gained}`
+    this.echoTrail = this.trail.map(point => ({ ...point }))
+    this.echoKind = 'capture'
+    this.capturePower = clamp(areaRatio * 8 + risk * 0.9 + (near ? 0.2 : 0), 0.22, 1)
     this.capturePulse = 1
     this.trail = []
     this.anchor = { ...this.player }
@@ -393,6 +435,8 @@ export class RainlineEngine {
     if (this.phase !== 'playing' || this.hitRecovery > 0) return
     this.lives -= 1
     this.combo = 0
+    this.echoTrail = this.trail.map(point => ({ ...point }))
+    this.echoKind = 'hit'
     this.hitPulse = 1
     this.message = '路径断裂'
     this.pointerActive = false
@@ -434,6 +478,11 @@ export class RainlineEngine {
     this.elapsed += safeDt
     this.capturePulse = Math.max(0, this.capturePulse - safeDt * 2.4)
     this.hitPulse = Math.max(0, this.hitPulse - safeDt * 3.4)
+    this.touchPulse = Math.max(0, this.touchPulse - safeDt * 4.2)
+    if (this.capturePulse <= 0 && this.hitPulse <= 0) {
+      this.echoTrail = []
+      this.echoKind = null
+    }
 
     if (this.phase === 'hit') {
       this.hitRecovery -= safeDt
@@ -474,11 +523,18 @@ export class RainlineEngine {
       message: this.message,
       occupied: this.occupied.slice(),
       trail: this.trail.map(point => ({ ...point })),
+      echoTrail: this.echoTrail.map(point => ({ ...point })),
+      echoKind: this.echoKind,
       player: { ...this.player },
+      target: { ...this.target },
+      pointerActive: this.pointerActive,
+      touchPoint: { ...this.touchPoint },
       enemy: { ...this.enemy },
       probe: { ...this.probe },
       capturePulse: this.capturePulse,
+      capturePower: this.capturePower,
       hitPulse: this.hitPulse,
+      touchPulse: this.touchPulse,
     }
   }
 
@@ -496,5 +552,18 @@ export class RainlineEngine {
     this.trail = [{ x: BOARD_W / 2, y: BOARD_H * 0.91 }, { x: BOARD_W / 2, y: BOARD_H * 0.45 }]
     this.anchor = { ...this.trail[0] }
     this.hit()
+  }
+
+  forceCaptureForQa() {
+    this.phase = 'playing'
+    this.enemy = { x: BOARD_W * 0.25, y: BOARD_H * 0.28 }
+    this.anchor = { x: BOARD_W * 0.5, y: BOARD_H * 0.91 }
+    this.player = { x: BOARD_W - CELL_W * 1.5, y: BOARD_H * 0.7 }
+    this.trail = [
+      { ...this.anchor },
+      { x: BOARD_W * 0.5, y: BOARD_H * 0.7 },
+      { ...this.player },
+    ]
+    this.capture()
   }
 }

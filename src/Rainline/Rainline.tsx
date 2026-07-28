@@ -2,6 +2,7 @@ import { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent,
 import { BOARD_H, BOARD_W, EngineSnapshot, GRID_H, GRID_W } from './types'
 import { RainlineEngine } from './engine'
 import { drawRainline } from './render'
+import { drawPortraitField } from './portrait'
 import { RainlineAudio } from './audio'
 import { detectLocale, makeT } from './i18n'
 import { useIdentity } from './useIdentity'
@@ -15,6 +16,7 @@ declare global {
       snapshot: () => EngineSnapshot
       forceWin: () => void
       forceHit: () => void
+      forceCapture: () => void
       reset: () => void
       identity: () => string
     }
@@ -47,6 +49,9 @@ export default function Rainline() {
   const ghostStage = useRef(0)
   const audio = useRef(new RainlineAudio())
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const portraitCanvasRef = useRef<HTMLCanvasElement>(null)
+  const portraitImageRef = useRef<HTMLImageElement | null>(null)
+  const lastPortraitDraw = useRef(0)
   const boardRef = useRef<HTMLDivElement>(null)
   const pageVisible = useRef(!document.hidden)
   const boardVisible = useRef(true)
@@ -74,6 +79,23 @@ export default function Rainline() {
   }, [])
 
   useEffect(() => {
+    const image = new Image()
+    image.decoding = 'async'
+    image.onload = () => {
+      portraitImageRef.current = image
+    }
+    image.onerror = () => {
+      portraitImageRef.current = null
+    }
+    image.src = identity.avatarUrl
+    return () => {
+      image.onload = null
+      image.onerror = null
+      if (portraitImageRef.current === image) portraitImageRef.current = null
+    }
+  }, [identity.avatarUrl])
+
+  useEffect(() => {
     const node = boardRef.current
     if (!node) return
     const observer = new IntersectionObserver(([entry]) => {
@@ -95,6 +117,7 @@ export default function Rainline() {
     qaApplied.current = true
     if (qaMode === 'win') engine.current.forceWinForQa()
     if (qaMode === 'hit') engine.current.forceHitForQa()
+    if (qaMode === 'capture') engine.current.forceCaptureForQa()
   }, [])
 
   useEffect(() => {
@@ -111,7 +134,7 @@ export default function Rainline() {
       engine.current.tick(dt)
       const current = engine.current.snapshot()
       let visual = current
-      if (!interactedRef.current && !baseline) {
+      if (!interactedRef.current && !baseline && !qaMode) {
         ghostClock.current += Math.min(dt, 0.034)
         if (ghostStage.current === 0) {
           ghostEngine.current.reset()
@@ -134,6 +157,15 @@ export default function Rainline() {
         ghostEngine.current.tick(dt)
         visual = ghostEngine.current.snapshot()
       }
+      const portraitInterval = reducedMotion
+        ? 100
+        : visual.phase === 'won' || visual.phase.startsWith('failed')
+          ? 66
+          : 33
+      if (portraitCanvasRef.current && now - lastPortraitDraw.current >= portraitInterval) {
+        drawPortraitField(portraitCanvasRef.current, portraitImageRef.current, visual, now / 1000, reducedMotion)
+        lastPortraitDraw.current = now
+      }
       if (canvasRef.current) drawRainline(canvasRef.current, visual, now / 1000, reducedMotion, baseline)
       if (now - lastUi > 70) {
         setSnapshot(current)
@@ -148,22 +180,33 @@ export default function Rainline() {
 
   useEffect(() => {
     const prior = previous.current
-    if (snapshot.capturePulse > prior.capturePulse) audio.current.capture(snapshot.trailLength > 180)
-    if (snapshot.hitPulse > prior.hitPulse) audio.current.hit()
-    if (snapshot.phase === 'won' && prior.phase !== 'won') audio.current.win()
+    if (snapshot.capturePulse > prior.capturePulse) {
+      const bigCapture = snapshot.capturePower >= 0.62
+      audio.current.capture(bigCapture)
+      if (hasInteracted && navigator.vibrate) navigator.vibrate(bigCapture ? [18, 24, 34] : 14)
+    }
+    if (snapshot.hitPulse > prior.hitPulse) {
+      audio.current.hit()
+      if (hasInteracted && navigator.vibrate) navigator.vibrate([35, 28, 58])
+    }
+    if (snapshot.phase === 'won' && prior.phase !== 'won') {
+      audio.current.win()
+      if (hasInteracted && navigator.vibrate) navigator.vibrate([18, 30, 24, 34, 70])
+    }
     if (snapshot.phase.startsWith('failed') && !prior.phase.startsWith('failed')) audio.current.lose()
     if ((snapshot.phase === 'won' || snapshot.phase.startsWith('failed')) && snapshot.score > bestScore) {
       setBestScore(snapshot.score)
       localStorage.setItem('rainline_best', String(snapshot.score))
     }
     previous.current = snapshot
-  }, [snapshot, bestScore])
+  }, [snapshot, bestScore, hasInteracted])
 
   useEffect(() => {
     window.__RAINLINE_QA__ = {
       snapshot: () => engine.current.snapshot(),
       forceWin: () => engine.current.forceWinForQa(),
       forceHit: () => engine.current.forceHitForQa(),
+      forceCapture: () => engine.current.forceCaptureForQa(),
       reset: () => engine.current.reset(),
       identity: () => identity.source,
     }
@@ -282,7 +325,12 @@ export default function Rainline() {
       : t('failedLives')
 
   return (
-    <main className={`rl ${snapshot.phase === 'hit' ? 'rl--hit' : ''}`}>
+    <main className={[
+      'rl',
+      snapshot.phase === 'hit' ? 'rl--hit' : '',
+      snapshot.trail.length > 1 ? 'rl--drawing' : '',
+      snapshot.capturePulse > 0 ? 'rl--capture' : '',
+    ].filter(Boolean).join(' ')}>
       <header className="rl__header">
         <div className="rl__lockup">
           <span className="rl__eyebrow">{t('subtitle')}</span>
@@ -343,17 +391,20 @@ export default function Rainline() {
             className="rl__portrait-image"
           />
         </svg>
+        <canvas ref={portraitCanvasRef} className="rl__portrait-particles" aria-hidden="true" />
         <canvas ref={canvasRef} className="rl__canvas" />
 
-        {!hasInteracted && !result && snapshot.phase !== 'paused' && (
+        {!hasInteracted && !qaMode && !result && snapshot.phase !== 'paused' && (
           <div className="rl__guide" aria-hidden="true">
             <span className="rl__guide-finger" />
             <p>{t('hint')}</p>
           </div>
         )}
 
-        {snapshot.message && snapshot.phase === 'playing' && (
-          <output className="rl__feedback" aria-live="polite">{snapshot.message}</output>
+        {snapshot.message && (snapshot.phase === 'playing' || snapshot.phase === 'hit') && (
+          <output className={`rl__feedback ${snapshot.phase === 'hit' ? 'is-danger' : ''}`} aria-live="polite">
+            {snapshot.message}
+          </output>
         )}
 
         {baseline && <div className="rl__diagnostic">{t('baseline')} · CPU GEOMETRY · DOM IDENTITY</div>}

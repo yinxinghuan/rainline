@@ -37,6 +37,18 @@
     animation: rl-hit 90ms linear 2;
   }
 
+  &--drawing &__board {
+    border-color: rgba(94, 242, 224, 0.76);
+    box-shadow:
+      0 0 0 1px rgba(7, 16, 23, 0.8),
+      0 0 24px rgba(94, 242, 224, 0.12),
+      0 20px 55px rgba(0, 0, 0, 0.42);
+  }
+
+  &--capture &__board {
+    border-color: rgba(255, 200, 87, 0.72);
+  }
+
   &__header,
   &__hud,
   &__footer {
@@ -164,6 +176,7 @@
       0 0 0 1px rgba(7, 16, 23, 0.8),
       0 20px 55px rgba(0, 0, 0, 0.42);
     touch-action: none;
+    transition: border-color 160ms ease, box-shadow 220ms ease;
 
     &:focus-visible {
       outline: 2px solid @portrait;
@@ -172,6 +185,7 @@
   }
 
   &__portrait,
+  &__portrait-particles,
   &__canvas {
     position: absolute;
     inset: 0;
@@ -180,11 +194,19 @@
   }
 
   &__portrait {
+    z-index: 0;
+    opacity: 0.28;
     background: @night;
   }
 
   &__portrait-image {
-    filter: grayscale(1) contrast(1.18) brightness(0.9);
+    filter: grayscale(1) contrast(1.28) brightness(0.82);
+  }
+
+  &__portrait-particles {
+    z-index: 1;
+    pointer-events: none;
+    filter: grayscale(1) contrast(1.34) brightness(0.94);
   }
 
   &__canvas {
@@ -241,6 +263,12 @@
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 13px;
     font-weight: 700;
+
+    &.is-danger {
+      color: @portrait;
+      border-color: @danger;
+      box-shadow: inset 3px 0 0 @danger;
+    }
   }
 
   &__diagnostic {

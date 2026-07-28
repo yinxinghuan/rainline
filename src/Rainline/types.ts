@@ -32,11 +32,18 @@ export type EngineSnapshot = {
   message: string
   occupied: Uint8Array
   trail: Point[]
+  echoTrail: Point[]
+  echoKind: 'capture' | 'hit' | null
   player: Point
+  target: Point
+  pointerActive: boolean
+  touchPoint: Point
   enemy: Point
   probe: Probe
   capturePulse: number
+  capturePower: number
   hitPulse: number
+  touchPulse: number
 }
 
 export type PlayerIdentity = {

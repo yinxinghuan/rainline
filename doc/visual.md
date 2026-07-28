@@ -12,7 +12,7 @@
 - 情绪承诺：在暴雨压住一切时，用一根精准、脆弱的光线把自己从水下抢回来。
 - 一句话视觉命题：**一张被雨淹没的夜间肖像地图，只有玩家闭合的发光边界能让
   水退去、身份显影。**
-- 标志性视觉时刻：一条长路径在风暴尖端擦过后闭合，FFT 星芒沿边界短暂掠过；
+- 标志性视觉时刻：一条长路径在风暴尖端擦过后闭合，六叶琥珀光芒沿边界短暂掠过；
   大片雨雾退开，肖像眼睛与名字第一次完整显现。
 - 三个必须品质：领地边界极清楚、雨面真实湿润、身份显影连续且可辨认。
 - 三个避免方向：纯视觉短片、霓虹线条堆叠、把头像切成粗糙重复马赛克。
@@ -60,7 +60,8 @@
 
 - 比例建议：雨夜与湿面 62%，头像/雾银 22%，路径电青 8%，琥珀 5%，危险 3%。
 - live trail 始终有亮芯 + 深边；危险始终有倒刺/脉冲方向，不只靠青红色相。
-- FFT bloom 只作用于 HDR 路径和琥珀捕获扫光，不卷积普通头像与 HUD。
+- 首版六叶光芒是 Canvas 光学降级，不称为 FFT bloom；未来真正接入 FFT 时也只能
+  作用于 HDR 路径和琥珀捕获扫光，不卷积普通头像与 HUD。
 - 禁止紫蓝霓虹渐变、持续彩虹、全屏白闪、透明玻璃 HUD、红绿二元判定。
 
 ## 4. Typography
@@ -175,11 +176,12 @@
 ### 正式 Skill 分层
 
 1. `rain-puddle-surface`：始终是底层材质和天气状态机。
-2. `interactive-image-particle-field`：身份层和捕获遮罩；不可读头像走连续 DOM/SVG。
-3. `luminous-path-trails`：条件启用，只表现威胁历史和结算余迹。
-4. `fft-convolution-bloom`：条件启用，只在闭合/近险/胜利峰值。
-5. `accumulated-bokeh-field`：结果静止态，最多 8–24 个可见雨滴焦面样本起步；
-   采样不足时直接降级，不让结算等待。
+2. `interactive-image-particle-field`：采用正式 Skill 的无读回 Canvas 降级合同；
+   同一张真实头像按对应细网格重绘，触点与捕获波产生局部位移。
+3. `luminous-path-trails`：采用头部/历史身体合同，以 Canvas 双层路径、流动节点、
+   闭合与断裂余迹实现；不宣称启用正式 WebGPU 模块。
+4. `fft-convolution-bloom`：首版未启用；六叶 Canvas 光芒只承担清楚的降级峰值。
+5. `accumulated-bokeh-field`：首版未启用；结果五边形湿面高光不称为累积散景。
 6. `particle-morph-field`：首版禁止。
 
 ### 反馈矩阵
@@ -191,7 +193,7 @@
 | 进入风险区 | live trail 亮芯出现 | 计时/风险生效 | 520 Hz 短音 | 2 | 只保留实线 |
 | 威胁接近 | 倒刺朝路径偏转 | 警戒距离环收缩 | 低频双脉冲 + 可选触觉 | 3 | 形状/文字警告 |
 | 小圈闭合 | 接触点锁定 | 雨雾退去、面积分出现 | 三音上行 | 2 | 120 ms 实色填充 |
-| 大圈闭合 | 琥珀扫光 | 大面积肖像显影、FFT 星芒 | 更长尾音 + 中触觉 | 4 | 无星芒，保留边界扫光 |
+| 大圈闭合 | 琥珀路径余迹 | 大面积头像细网格显影、六叶光芒与局部粒子波 | 更长尾音 + 中触觉 | 4 | 无动态光叶，保留实色余迹 |
 | 连锁提升 | 倍率刻度跳一级 | 边界余迹延长但不增碰撞 | 音高升阶 | 3 | 静态倍率文字 |
 | 近险闭合 | 威胁与路径最近点闪一次 | “险过 +25%” | 独特短音 + 中触觉 | 4 | 无闪烁，使用倒刺距离线 |
 | 路径切断 | X 断口同帧出现 | live trail 从切点向两端熄灭、生命减少 | 下坠音 + 重触觉 | 5 | 静态断口、无抖动 |
@@ -207,7 +209,7 @@
 
 - 经典 Qix/圈地结构：
   - Useful principle：安全边界、暴露路径、敌人切线、把敌人留在未占领侧。
-  - Adaptation：自由拖线 + 固定速度路径头 + 雨面身份显影。
+  - Adaptation：自由拖线 + 距离自适应但不瞬移的路径头 + 雨面身份显影。
   - Element not to copy：商业作品的具体图形、关卡、音效、角色和源代码。
 - `rain-puddle-surface`：
   - Useful principle：雨量与湿度分离、真实 impact/normal/reflection。
@@ -219,15 +221,15 @@
   - Element not to copy：哨兵造型、群体高潮和原项目 UI。
 - `interactive-image-particle-field`：
   - Useful principle：真实身份图像成为效果主体。
-  - Adaptation：占领 polygon 控制连续头像点阵显影。
+  - Adaptation：占领 polygon 控制同一真实头像的对应细网格，并在触点附近局部位移。
   - Element not to copy：上游样板肖像和粗 tile fallback。
 - `fft-convolution-bloom`：
   - Useful principle：kernel 形状成为稀有光学反馈。
-  - Adaptation：只用于大圈、近险和胜利。
+  - Adaptation：首版仅用六叶 Canvas 降级表达 kernel 轮廓；正式 FFT 尚未启用。
   - Element not to copy：Arcade 的 CRT、标题、声像机和游戏闭环。
 - `accumulated-bokeh-field`：
   - Useful principle：静止时逐渐显影的焦面。
-  - Adaptation：只用于结果态雨滴和肖像深度。
+  - Adaptation：首版未启用；五边形湿面高光不作为累积散景验收证据。
   - Element not to copy：粒子蛛网主体和三焦点玩法。
 
 ## 10. Anti-patterns
