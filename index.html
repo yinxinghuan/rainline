@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#071017" />
+    <meta name="description" content="Rainline — 在暴雨中围出你的肖像。" />
+    <style>
+      html,body,#root{width:100%;height:100%;margin:0;background:#071017}
+      #root{display:grid;place-items:center}
+      .boot-rain{position:fixed;inset:0;background:radial-gradient(circle at 50% 30%,#173443 0,#071017 62%);overflow:hidden}
+      .boot-rain::after{content:"";position:absolute;inset:-30%;background:repeating-linear-gradient(104deg,transparent 0 18px,rgba(168,187,194,.08) 19px 20px,transparent 21px 38px);animation:boot-rain 1.1s linear infinite}
+      @keyframes boot-rain{to{transform:translate3d(-24px,44px,0)}}
+    </style>
+    <style id="alteru-long-press-guard">html,body,#app,#root{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}input,textarea,[contenteditable="true"]{-webkit-touch-callout:default;-webkit-user-select:text;user-select:text}img,svg,canvas{-webkit-user-drag:none}</style>
+    <script src="https://images.aiwaves.tech/alteru/guest-shell.js" defer></script>
+  </head>
+  <body>
+    <div id="root"><div class="boot-rain" aria-hidden="true"></div></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

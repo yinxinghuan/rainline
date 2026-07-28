@@ -1,0 +1,11 @@
+Rainline does not distribute third-party game code, shaders, textures, audio,
+models, fonts, or stock artwork.
+
+The game is an original implementation. Its rain surface and deterministic
+territory engine were written independently. The AlterU watermark and canonical
+default-avatar image are first-party project assets. The poster was generated
+through the first-party Aigram transit image service.
+
+Runtime package licenses for React, ReactDOM, Vite, TypeScript, and Less remain
+available through package-lock.json and their installed package metadata; no
+library code is copied into this notice as a separate media asset.
